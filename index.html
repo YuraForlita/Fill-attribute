@@ -102,22 +102,7 @@
       resultBody.innerHTML = "";
 
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "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"
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              {
-                role: "system",
-                content: `Ти асистент, що заповнює характеристики духовок. Для моделі ${brand} ${model} знайди тільки ті атрибути, які входять у список. Якщо якесь значення не знайдено в дозволених — виводь його, але відмічай як нове. Формат: "Атрибут: Значення".`
-              }
-            ]
-          })
-        });
+        const response = await fetch(`https://YOUR-VERCEL-APP.vercel.app/api/get-gpt-data?brand=...`);
 
         const data = await response.json();
         const text = data.choices[0].message.content;
