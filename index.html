@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Автозаповнення характеристик духовки</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f9f9f9;
+    }
+    h1 {
+      font-size: 1.8rem;
+    }
+    label, input, button {
+      font-size: 1rem;
+    }
+    input {
+      padding: 0.5rem;
+      margin-right: 0.5rem;
+    }
+    button {
+      padding: 0.6rem 1.2rem;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      margin-top: 2rem;
+      border-collapse: collapse;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.5rem;
+      border-bottom: 1px solid #ccc;
+    }
+    .loading {
+      margin-top: 1rem;
+      font-style: italic;
+    }
+    .unknown {
+      background-color: #ffe4e1;
+      color: #a00;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Автозаповнення характеристик духовки</h1>
+  <div>
+    <label for="brand">Бренд:</label>
+    <input type="text" id="brand" placeholder="Наприклад: Bosch" />
+    <label for="model">Модель:</label>
+    <input type="text" id="model" placeholder="Наприклад: HJG852YB0T" />
+    <button id="fetchBtn">Отримати характеристики</button>
+  </div>
+
+  <div id="status" class="loading"></div>
+
+  <table id="resultTable" style="display: none;">
+    <thead>
+      <tr><th>Атрибут</th><th>Значення</th></tr>
+    </thead>
+    <tbody id="resultBody"></tbody>
+  </table>
+
+  <script>
+    const fetchBtn = document.getElementById("fetchBtn");
+    const status = document.getElementById("status");
+    const resultTable = document.getElementById("resultTable");
+    const resultBody = document.getElementById("resultBody");
+
+    let attributesBase = {};
+
+    async function loadAttributes() {
+      const res = await fetch("attributes.json");
+      attributesBase = await res.json();
+    }
+
+    function normalize(text) {
+      return text.toLowerCase().replace(/\s+/g, " ").trim();
+    }
+
+    function isKnown(attr, value) {
+      if (!attributesBase[attr]) return false;
+      const normalizedValue = normalize(value);
+      return attributesBase[attr].some(v => normalize(v) === normalizedValue);
+    }
+
+    fetchBtn.addEventListener("click", async () => {
+      const brand = document.getElementById("brand").value.trim();
+      const model = document.getElementById("model").value.trim();
+
+      if (!brand || !model) {
+        alert("Будь ласка, введіть бренд і модель.");
+        return;
+      }
+
+      status.textContent = "Пошук інформації...";
+      resultTable.style.display = "none";
+      resultBody.innerHTML = "";
+
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer YOUR_OPENAI_API_KEY"
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: `Ти асистент, що заповнює характеристики духовок. Для моделі ${brand} ${model} знайди тільки ті атрибути, які входять у список. Якщо якесь значення не знайдено в дозволених — виводь його, але відмічай як нове. Формат: "Атрибут: Значення".`
+              }
+            ]
+          })
+        });
+
+        const data = await response.json();
+        const text = data.choices[0].message.content;
+
+        const lines = text.split("\n").filter(l => l.includes(":"));
+        for (const line of lines) {
+          const [key, ...rest] = line.split(":");
+          const value = rest.join(":").trim();
+          const row = document.createElement("tr");
+          const isValid = isKnown(key.trim(), value);
+          row.innerHTML = `<td>${key}</td><td class="${!isValid ? 'unknown' : ''}">${value}</td>`;
+          resultBody.appendChild(row);
+        }
+
+        status.textContent = "";
+        resultTable.style.display = "table";
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Помилка при отриманні даних. Спробуйте ще раз.";
+      }
+    });
+
+    loadAttributes();
+  </script>
+</body>
+</html>
